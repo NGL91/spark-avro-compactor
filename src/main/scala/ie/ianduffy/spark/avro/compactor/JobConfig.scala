@@ -6,7 +6,9 @@ case class JobConfig(input: String = null,
                      output: String = null,
                      schemaRegistryUrl: String = null,
                      schemaRegistrySubject: String = null,
-                     overrideOutput: Boolean = false)
+                     overrideOutput: Boolean = false,
+                     primaryKey: String = null,
+                     timestampKey: String = null)
 
 object JobConfig {
 
@@ -38,6 +40,16 @@ object JobConfig {
       .text("If set will override the files in the given output path should a conflict exist.")
       .optional()
       .action((v, c) => c.copy(overrideOutput = v))
+    opt[String]("primary-key")
+      .valueName("<primary-key>")
+      .text("primary key of record used to compaction")
+      .optional()
+      .action((v, c) => c.copy(primaryKey = v))
+    opt[String]("timestamp-key")
+      .valueName("<timestamp-key>")
+      .text("timestamp key of record used to compare for compaction")
+      .optional()
+      .action((v, c) => c.copy(timestampKey = v))
   }
 
   def parse(args: Seq[String]): JobConfig = {

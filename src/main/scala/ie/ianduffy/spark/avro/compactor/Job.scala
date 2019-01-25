@@ -9,8 +9,24 @@ import org.apache.avro.mapreduce.AvroKeyOutputFormat
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.NullWritable
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.avro.SchemaConverters
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.slf4j.LoggerFactory
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+
+object MySchemaConversions {
+  def createConverterToSQL(avroSchema: Schema, sparkSchema: DataType): GenericRecord => Row =
+    Utils.createConverterToSQL(avroSchema, sparkSchema).asInstanceOf[GenericRecord => Row]
+}
+
+object MyObject{
+  def myConverter(record: GenericRecord,
+                  myAvroRecordConverter: GenericRecord => Row): Row =
+    myAvroRecordConverter.apply(record)
+}
 
 object Job {
 
@@ -26,6 +42,8 @@ object Job {
     implicit val sparkConfig: Configuration = spark.sparkContext.hadoopConfiguration
     sparkConfig.set("avro.schema.input.key", schema.toString())
     sparkConfig.set("avro.schema.output.key", schema.toString())
+    sparkConfig.set("fs.s3n.awsAccessKeyId", spark.conf.get("spark.hadoop.fs.s3a.access.key"))
+    sparkConfig.set("fs.s3n.awsSecretAccessKey", spark.conf.get("spark.hadoop.fs.s3a.secret.key"))
 
     val inputPath: Path = new Path(jobConfig.input)
     val outputPath: Path = new Path(jobConfig.output)
@@ -52,13 +70,38 @@ object Job {
 
     val rdd = readHadoopFile(spark, inputPath.toString)
 
-    rdd.coalesce(numPartitions)
-      .saveAsNewAPIHadoopFile(
-        outputPath.toString,
-        classOf[AvroKey[GenericRecord]],
-        classOf[NullWritable],
-        classOf[AvroKeyOutputFormat[GenericRecord]],
-        sparkConfig
-      )
+    if (jobConfig.primaryKey != null && jobConfig.timestampKey != null) {
+      val filtered_df = compaction(spark, schema, jobConfig.primaryKey, jobConfig.timestampKey, rdd)
+      filtered_df.repartition(numPartitions).write.format("avro").save(outputPath.toString)
+    } else {
+      rdd.coalesce(numPartitions)
+        .saveAsNewAPIHadoopFile(
+          outputPath.toString,
+          classOf[AvroKey[GenericRecord]],
+          classOf[NullWritable],
+          classOf[AvroKeyOutputFormat[GenericRecord]],
+          sparkConfig
+        )
+    }
+
+  }
+
+  def compaction(spark: SparkSession, schema: Schema, primaryKey: String, timestampKey: String, rdd: RDD[(AvroKey[GenericRecord], NullWritable)]): DataFrame = {
+    val myAvroSchema = SchemaConverters.toSqlType(schema).dataType
+    val rddSchema =myAvroSchema.asInstanceOf[StructType]
+    val myAvroRecordConverter = MySchemaConversions.createConverterToSQL(schema, myAvroSchema)
+    var rowRDD = rdd.map(record =>
+      MyObject.myConverter(record._1.datum(), myAvroRecordConverter))
+    val df = spark.createDataFrame(rowRDD, rddSchema)
+
+    val windowSpec = Window.partitionBy(df(primaryKey)).orderBy(df(timestampKey).desc)
+
+    val maxColName = "max" ++ primaryKey
+
+    val filtered_df = df.withColumn(maxColName, first(timestampKey).over(windowSpec))
+      .select("*").where(col(maxColName) === col(timestampKey))
+      .drop(maxColName)
+
+    filtered_df
   }
 }
