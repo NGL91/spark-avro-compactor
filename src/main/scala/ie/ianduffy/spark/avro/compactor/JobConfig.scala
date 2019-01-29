@@ -6,9 +6,12 @@ case class JobConfig(input: String = null,
                      output: String = null,
                      schemaRegistryUrl: String = null,
                      schemaRegistrySubject: String = null,
-                     overrideOutput: Boolean = false,
+                     flushInput: Boolean = false,
+                     overrideOutput: Boolean = true,
                      primaryKey: String = null,
-                     timestampKey: String = null)
+                     timestampKey: String = null,
+                     isDaylyRun: Boolean = false,
+                     isMonthlyRun: Boolean = false)
 
 object JobConfig {
 
@@ -35,6 +38,11 @@ object JobConfig {
       .text("Schema Registry Subject")
       .required()
       .action((v, c) => c.copy(schemaRegistrySubject = v))
+    opt[Boolean]("flush-input")
+      .valueName("<flush-input>")
+      .text("If set will flush the files in the given input path.")
+      .optional()
+      .action((v, c) => c.copy(flushInput = v))
     opt[Boolean]("override-output")
       .valueName("<override-output>")
       .text("If set will override the files in the given output path should a conflict exist.")
@@ -50,6 +58,16 @@ object JobConfig {
       .text("timestamp key of record used to compare for compaction")
       .optional()
       .action((v, c) => c.copy(timestampKey = v))
+    opt[Boolean]("daily-run")
+      .valueName("<daily-run>")
+      .text("If compact avro files of previous day")
+      .optional()
+      .action((v, c) => c.copy(isDaylyRun = v))
+    opt[Boolean]("monthly-run")
+      .valueName("<monthly-run>")
+      .text("If compact avro files of previous month")
+      .optional()
+      .action((v, c) => c.copy(isMonthlyRun = v))
   }
 
   def parse(args: Seq[String]): JobConfig = {

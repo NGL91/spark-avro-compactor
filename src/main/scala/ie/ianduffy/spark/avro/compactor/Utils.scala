@@ -14,7 +14,6 @@ import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.types._
 
 import scala.collection.JavaConverters._
-//import java.sql.Timestamp
 
 class IncompatibleSchemaException(msg: String, ex: Throwable = null) extends Exception(msg, ex)
 

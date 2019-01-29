@@ -42,8 +42,8 @@ object Job {
     implicit val sparkConfig: Configuration = spark.sparkContext.hadoopConfiguration
     sparkConfig.set("avro.schema.input.key", schema.toString())
     sparkConfig.set("avro.schema.output.key", schema.toString())
-    sparkConfig.set("fs.s3n.awsAccessKeyId", spark.conf.get("spark.hadoop.fs.s3a.access.key"))
-    sparkConfig.set("fs.s3n.awsSecretAccessKey", spark.conf.get("spark.hadoop.fs.s3a.secret.key"))
+    sparkConfig.set("fs.s3n.awsAccessKeyId", spark.conf.get("spark.hadoop.fs.s3n.access.key"))
+    sparkConfig.set("fs.s3n.awsSecretAccessKey", spark.conf.get("spark.hadoop.fs.s3n.secret.key"))
 
     val inputPath: Path = new Path(jobConfig.input)
     val outputPath: Path = new Path(jobConfig.output)
@@ -51,17 +51,24 @@ object Job {
     val fs: FileSystem = inputPath.getFileSystem(sparkConfig)
 
     // avoid raising org.apache.hadoop.mapred.FileAlreadyExistsException
-    if (jobConfig.overrideOutput) fs.delete(outputPath, true)
+    if (jobConfig.overrideOutput) {
+      log.info("Delete output path")
+      fs.delete(outputPath, true)
+    }
 
     // from fileSystem prefix with s3 the default is 64MB and can be overwitten by fs.s3.block.size
     // from fileSystem prefix with s3a the default is 32MB and can be overwitten by setting fs.s3a.block.size
     val outputBlocksize: Long = fs.getDefaultBlockSize(outputPath)
-
     // Where inputPath is of the form s3://some/path
+
+    val check = fs.exists(inputPath)
+    if (! check) {
+      log.info(s"Can not find input path: $inputPath")
+      return None
+    }
     val inputPathSize: Long = fs.getContentSummary(inputPath).getSpaceConsumed
 
     val numPartitions: Int = Math.max(1, Math.floor((inputPathSize / CompressionRatio.AVRO_SNAPPY) / outputBlocksize).toInt)
-
     log.debug(
       s"""outputBlocksize: $outputBlocksize
          | inputPathSize: $inputPathSize
@@ -82,6 +89,10 @@ object Job {
           classOf[AvroKeyOutputFormat[GenericRecord]],
           sparkConfig
         )
+    }
+    if (jobConfig.flushInput) {
+      log.info("Delete input path")
+      fs.delete(inputPath, true)
     }
 
   }
