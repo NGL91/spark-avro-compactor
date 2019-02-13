@@ -32,7 +32,7 @@ object Runner extends App {
   /**
     * Update input-output = input-output/
     *                                   year/month/day of previous day in case of isDaylyRun
-    *                                   year/month of previous day in case of isMonthlyRun
+    *                                   year/month     of previous day in case of isMonthlyRun
     */
   def customConfig(config: JobConfig): JobConfig = {
 
