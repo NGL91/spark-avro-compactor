@@ -42,8 +42,11 @@ object Job {
     implicit val sparkConfig: Configuration = spark.sparkContext.hadoopConfiguration
     sparkConfig.set("avro.schema.input.key", schema.toString())
     sparkConfig.set("avro.schema.output.key", schema.toString())
-    sparkConfig.set("fs.s3n.awsAccessKeyId", spark.conf.get("spark.hadoop.fs.s3n.access.key"))
-    sparkConfig.set("fs.s3n.awsSecretAccessKey", spark.conf.get("spark.hadoop.fs.s3n.secret.key"))
+
+    if (System.getenv("local") != null) {
+      sparkConfig.set("fs.s3n.awsAccessKeyId", spark.conf.get("spark.hadoop.fs.s3n.access.key"))
+      sparkConfig.set("fs.s3n.awsSecretAccessKey", spark.conf.get("spark.hadoop.fs.s3n.secret.key"))
+    }
 
     val inputPath: Path = new Path(jobConfig.input)
     val outputPath: Path = new Path(jobConfig.output)
