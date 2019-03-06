@@ -11,6 +11,12 @@ Extend feature:
 1. `local=true sbt`
 2. `runMain ie.ianduffy.spark.avro.compactor.Runner --input inputPath --output outputPath --flush-input false --override-output false outputPath --schema-registry-url https://confluent-schema-registry --schema-registry-subject schema-subject --primary-key primary_key_field --timestamp-key timestamp_key_field` 
 
+## Create all-in-one jar file
+
+```
+    sbt assembly
+```
+
 ### Notice
 
 1. Uncomment line ` "com.amazonaws" % "aws-java-sdk-core" % "1.10.6",` if missing library (build.sbt)

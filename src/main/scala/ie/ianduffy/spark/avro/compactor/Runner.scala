@@ -45,12 +45,15 @@ object Runner extends App {
       month = "0" ++ month
     }
 
-    val day = previousDay.getDayOfMonth
+    var day = previousDay.getDayOfMonth.toString
+    if (day.size != 2) {
+      day = "0" ++ day
+    }
 
     var newInput = config.input
     var newOutput = config.output
     if (config.isDaylyRun) {
-      val path = year.toString ++ "/" ++ month ++ "/" ++ day.toString
+      val path = year.toString ++ "/" ++ month ++ "/" ++ day
       newInput = config.input ++ "/" ++ path
       newOutput = config.output ++ "/" ++ path
 
